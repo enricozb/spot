@@ -1,4 +1,4 @@
-# Spot - Unbelievably Dumb Dotfiles Management
+# Spot - Unbelievably Dumb Dotfile Management
 
 ## Install
 Push `spot.sh` somewhere special.
