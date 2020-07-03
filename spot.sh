@@ -66,7 +66,9 @@ sync() {
   local DRY_RUN_FLAG=$([ "$DRY_RUN" -eq 1 ] && echo "--dry-run")
   local REDIRECT=$([ "$VERBOSE" -eq 0 ] && echo "> /dev/null")
   local FLAGS=$([ "$VERBOSE" -eq 1 ] && echo "-itau" || echo "-tau")
-  cmd "rsync --exclude '.git' $FLAGS $DRY_RUN_FLAG '$1' '$SPOTFILES_DIR/$2' $REDIRECT"
+  local EXTRA="${@:3}"
+
+  cmd "rsync --exclude '.git' $FLAGS $DRY_RUN_FLAG '$1' '$SPOTFILES_DIR/$2' $EXTRA $REDIRECT"
 }
 
 print_usage() {
@@ -78,7 +80,7 @@ Usage: spot [options] command [args...]
   spot add [(-d | --dir) name] (folder | files...)
   spot list
   spot repo url
-  spot sync
+  spot sync [(-x | --delete)]
 
 Commands:
   add   Starts tracking a file or folder. If tracking a single file, you must
@@ -91,7 +93,8 @@ Commands:
 
   sync  Synchronize tracked files. This uses rsync to sync from local to repo
         first, and then from repo to local. Based on timestamps, rsync decides
-        whether or not to overwrite a file.
+        whether or not to overwrite a file. Use --delete or -x to remove files
+        that were deleted from being tracked.
 Options:
   --help     prints this message
   --dry-run  prints out the commands and without executing them
@@ -107,6 +110,7 @@ main() {
   for arg in "$@"; do
     shift
     case "$arg" in
+      --delete)  set -- "$@" "-x";;
       --dir)     set -- "$@" "-d";;
       --dry-run) set -- "$@" "-D";;
       --help)    set -- "$@" "-h";;
@@ -163,7 +167,7 @@ main() {
 
   # ---------------------------------- main ----------------------------------
   # all operations should be done from within the spotfiles directory
-  cmd "cd '$SPOTFILES_DIR'"
+  cd "$SPOTFILES_DIR"
   spot_${cmd} $args
 }
 
@@ -175,8 +179,7 @@ spot_add() {
 
   local tracking_dir
   OPTIND=1
-  while getopts "d:" OPTION
-  do
+  while getopts "d:" OPTION; do
     case "$OPTION" in
       "d")
         tracking_dir="${OPTARG%/}";;
@@ -207,7 +210,7 @@ spot_add() {
 }
 
 spot_list() {
-  cmd "tree '$SPOTFILES_DIR' -a -I '.git*|spot-config' -C"
+  cmd "tree '$SPOTFILES_DIR' -a -I '.git*|spot-config|README.md' -C"
 }
 
 spot_repo() {
@@ -215,6 +218,14 @@ spot_repo() {
 }
 
 spot_sync() {
+  local extra
+  OPTIND=1
+  while getopts "x" OPTION; do
+    case "$OPTION" in
+      "x") extra="$extra --delete";;
+    esac
+  done
+
   cmd 'echo "# my dotfiles" > README.md'
   cmd 'echo "|Source|Destination|" >> README.md'
   cmd 'echo "|---|---|" >> README.md'
@@ -226,7 +237,7 @@ spot_sync() {
       cmd "echo '|$spot|$orig|' >> README.md"
     fi
 
-    sync "$orig" "$spot"
+    sync "$orig" "$spot" "$extra"
   done < <(cat $SPOTFILES_CONFIG | sort)
 
   commit "manual sync"
