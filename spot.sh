@@ -79,6 +79,10 @@ commit() {
   fi
 }
 
+pull() {
+  cmd "git pull origin master"
+}
+
 push() {
   cmd "git push -u origin master"
 }
@@ -106,8 +110,9 @@ Usage: spot [options] command [args...]
   spot add [(-d | --dir) name] (folder | files...)
   spot clone url
   spot list
+  spot (pull | push)
   spot repo url
-  spot sync [(-x | --delete)] [(-f | --from) | (-t | --to)]
+  spot sync [(-x | --delete)] [(-f | --from) | (-t | --to)] [(-m | --message)]
 
 Commands:
   add   Starts tracking a file or folder. If tracking a single file, you must
@@ -117,6 +122,10 @@ Commands:
   clone Clone a dotfiles repository created with spot.
 
   list  Show a tree of all tracked files.
+
+  pull  Pulls changes to remote spot repo.
+
+  push  Pushes changes to spot repo.
 
   repo  Set the upstream repository for your dotfiles.
 
@@ -145,6 +154,7 @@ main() {
       --dry-run) set -- "$@" "-D";;
       --from)    set -- "$@" "-f";;
       --help)    set -- "$@" "-h";;
+      --message) set -- "$@" "-m";;
       --to)      set -- "$@" "-t";;
       --verbose) set -- "$@" "-v";;
       --*)       error "unknown option $(bold $arg)";;
@@ -174,7 +184,7 @@ main() {
   local cmd
   local args
   case $1 in
-    add|list|repo|sync)
+    add|clone|list|pull|push|repo|sync)
       cmd=${1}
       args="${@:2}"
       ;;
@@ -201,7 +211,7 @@ main() {
   # all operations should be done from within the spotfiles directory
   cd "$SPOTFILES_DIR"
   debug "calling '${cmd}' with args=$args"
-  spot_${cmd} $args
+  spot_${cmd} "$args"
 }
 
 
@@ -274,6 +284,10 @@ spot_list() {
   cmd "tree '$SPOTFILES_DIR' -a -I '.git*|spot-config|README.md' -C"
 }
 
+spot_pull() { pull; }
+
+spot_push() { push; }
+
 spot_repo() {
   cmd "git remote add origin $1"
 }
@@ -281,11 +295,13 @@ spot_repo() {
 spot_sync() {
   local extra=()
   local direction="to"
+  local message="manual sync"
   OPTIND=1
-  while getopts "ftx" OPTION; do
+  while getopts "fm:tx" OPTION; do
     case "$OPTION" in
       "f") direction="from";;
       "t") direction="to";;
+      "m") message="$OPTARG";;
       "x") extra+=("--delete");;
     esac
   done
@@ -302,7 +318,7 @@ spot_sync() {
     fi
   done < <(cat $SPOTFILES_CONFIG | sort)
 
-  if commit "manual sync"; then
+  if commit "$message"; then
     push
   fi
 }
