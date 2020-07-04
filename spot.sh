@@ -2,27 +2,41 @@
 
 set -e
 
-SPOTFILES_DIR="$XDG_CONFIG_HOME/spot"
+if [[ -z $XDG_CONFIG_HOME ]]; then
+  CONFIG_DIR="$HOME/.config"
+else
+  CONFIG_DIR="$XDG_CONFIG_HOME"
+fi
+
+
+SPOTFILES_DIR="$CONFIG_DIR/spot"
 SPOTFILES_CONFIG="$SPOTFILES_DIR/spot-config"
 DRY_RUN=0
 VERBOSE=0
 
 # ---------------------------------- style ----------------------------------
-bold() {
-  echo "$(tput bold)$@$(tput sgr0)"
-}
+bold() { echo "$(tput bold)$@$(tput sgr0)"; }
+red() { echo "$(tput setaf 1)$@$(tput sgr0)"; }
+green() { echo "$(tput setaf 2)$@$(tput sgr0)"; }
+yellow() { echo "$(tput setaf 3)$@$(tput sgr0)"; }
+blue() { echo "$(tput setaf 4)$@$(tput sgr0)"; }
 
-dirstyle() {
-  echo "$(tput setaf 2)$@$(tput sgr0)"
-}
+dirstyle() { echo "$(bold $(blue $@))"; }
 
 info() {
-  echo "$(tput setaf 3)$@$(tput sgr0)"
+  local NEWLINE=$([ $DRY_RUN -eq 1 -o $VERBOSE -eq 1 ] && echo "\n")
+  echo -e "$NEWLINE$(green INFO:) $@"
+}
+
+debug() {
+  if [[ $DRY_RUN -eq 1 ]] || [[ $VERBOSE -eq 1 ]]; then
+    echo -e "\n$(yellow DEBUG:) $@"
+  fi
 }
 
 warn() {
   local NEWLINE=$([ $DRY_RUN -eq 1 -o $VERBOSE -eq 1 ] && echo "\n")
-  echo -e "$NEWLINE$(tput setaf 1)INFO:$(tput sgr0) $@"
+  echo -e "$NEWLINE$(tput setaf 1)WARN:$(tput sgr0) $@"
 }
 
 title() {
@@ -30,18 +44,26 @@ title() {
 }
 
 error() {
-  echo -e "\n$(bold Error): $@"
+  echo -e "\n$(bold $(red ERROR:)) $@"
   exit 1
 }
 
 
 # ----------------------------------- ops -----------------------------------
+join_by() {
+  local IFS="$1"
+  shift
+  echo "$*"
+}
+
 cmd() {
   if [[ $DRY_RUN -eq 0 ]]; then
-    [ $VERBOSE -eq 1 ] && echo "$(info +) $1"
+    if [[ $VERBOSE -eq 1 ]]; then
+      echo "$(yellow +) $1"
+    fi
     eval $1
   else
-    echo "$(info -) $1"
+    echo "$(yellow -) $1"
   fi
 }
 
@@ -50,6 +72,10 @@ commit() {
     local REDIRECT=$([ "$VERBOSE" -eq 0 ] && echo "> /dev/null")
     cmd "git add --all $REDIRECT"
     cmd "git commit -m '$1' $REDIRECT"
+    return 0
+  else
+    info "no changes detected, not committing anything"
+    return 1
   fi
 }
 
@@ -65,10 +91,10 @@ track() {
 sync() {
   local DRY_RUN_FLAG=$([ "$DRY_RUN" -eq 1 ] && echo "--dry-run")
   local REDIRECT=$([ "$VERBOSE" -eq 0 ] && echo "> /dev/null")
-  local FLAGS=$([ "$VERBOSE" -eq 1 ] && echo "-itau" || echo "-tau")
+  local FLAGS=$([ "$VERBOSE" -eq 1 ] && echo "-ita" || echo "-ta")
   local EXTRA="${@:3}"
 
-  cmd "rsync --exclude '.git' $FLAGS $DRY_RUN_FLAG '$1' '$SPOTFILES_DIR/$2' $EXTRA $REDIRECT"
+  cmd "rsync --exclude '.git' $FLAGS $DRY_RUN_FLAG '$1' '$2' $EXTRA $REDIRECT"
 }
 
 print_usage() {
@@ -78,23 +104,27 @@ spot - dotfile manager
 
 Usage: spot [options] command [args...]
   spot add [(-d | --dir) name] (folder | files...)
+  spot clone url
   spot list
   spot repo url
-  spot sync [(-x | --delete)]
+  spot sync [(-x | --delete)] [(-f | --from) | (-t | --to)]
 
 Commands:
   add   Starts tracking a file or folder. If tracking a single file, you must
         specify which folder it should be tracked under with --dir <name>. For
         example, 'spot add ~/.tmux.conf --dir tmux'.
 
+  clone Clone a dotfiles repository created with spot.
+
   list  Show a tree of all tracked files.
 
   repo  Set the upstream repository for your dotfiles.
 
   sync  Synchronize tracked files. This uses rsync to sync from local to repo
-        first, and then from repo to local. Based on timestamps, rsync decides
-        whether or not to overwrite a file. Use --delete or -x to remove files
-        that were deleted from being tracked.
+        first, and then from repo to local.Use --delete or -x to remove files
+        that were deleted from being tracked. Use --from to sync from the
+        repo, otherwise --to syncs to the repo. The --to flag does nothing,
+        as it is set by default.
 Options:
   --help     prints this message
   --dry-run  prints out the commands and without executing them
@@ -113,7 +143,9 @@ main() {
       --delete)  set -- "$@" "-x";;
       --dir)     set -- "$@" "-d";;
       --dry-run) set -- "$@" "-D";;
+      --from)    set -- "$@" "-f";;
       --help)    set -- "$@" "-h";;
+      --to)      set -- "$@" "-t";;
       --verbose) set -- "$@" "-v";;
       --*)       error "unknown option $(bold $arg)";;
       *)         set -- "$@" "$arg";;
@@ -168,6 +200,7 @@ main() {
   # ---------------------------------- main ----------------------------------
   # all operations should be done from within the spotfiles directory
   cd "$SPOTFILES_DIR"
+  debug "calling '${cmd}' with args=$args"
   spot_${cmd} $args
 }
 
@@ -187,9 +220,16 @@ spot_add() {
   done
 
   if [ -d "$arg" ]; then
-    warn "tracking dotfiles folder $(dirstyle $arg)"
-    track "$arg/" "$(basename $arg)"
-    commit "tracking $(basename $arg)"
+    local src="$arg/"
+    local dst="$(basename $arg)"
+
+    if [[ -d $dst ]]; then
+      error "$(dirstyle $src) is already being tracked under $(dirstyle $dst)"
+    fi
+
+    info "tracking dotfiles folder $(dirstyle $src)"
+    track "$src" "$dst"
+    commit "tracking $dst"
 
   elif [[ -f $arg ]]; then
     if [[ -z ${tracking_dir+x} ]]; then
@@ -199,7 +239,11 @@ spot_add() {
     local src="$arg"
     local dst="$tracking_dir/$(basename $arg)"
 
-    warn "tracking $(dirstyle $src) under $(dirstyle $tracking_dir/)"
+    if [[ -f $dst ]]; then
+      error "$(dirstyle $src) is already being tracked under $(dirstyle $dst)"
+    fi
+
+    info "tracking $(dirstyle $src) under $(dirstyle $tracking_dir/)"
     cmd "mkdir $(dirname $dst)"
     track "$src" "$dst"
     commit "tracking $tracking_dir/$(basename $arg)"
@@ -207,6 +251,23 @@ spot_add() {
     echo "'$arg' is not a file or directory"
     exit 1
   fi
+
+  debug "updating README.md"
+  cmd 'echo "# my dotfiles" > README.md'
+  cmd 'echo "|Source|Destination|" >> README.md'
+  cmd 'echo "|---|---|" >> README.md'
+  while read line; do
+    read orig spot <<<$(IFS="->"; echo $line)
+    if [ ${orig: -1} == "/" ]; then
+      cmd "echo '|$spot/|$orig|' >> README.md"
+    else
+      cmd "echo '|$spot|$orig|' >> README.md"
+    fi
+  done < <(cat $SPOTFILES_CONFIG | sort)
+}
+
+spot_clone() {
+  cmd "git clone $1 '$SPOTFILES_DIR'"
 }
 
 spot_list() {
@@ -218,30 +279,32 @@ spot_repo() {
 }
 
 spot_sync() {
-  local extra
+  local extra=()
+  local direction="to"
   OPTIND=1
-  while getopts "x" OPTION; do
+  while getopts "ftx" OPTION; do
     case "$OPTION" in
-      "x") extra="$extra --delete";;
+      "f") direction="from";;
+      "t") direction="to";;
+      "x") extra+=("--delete");;
     esac
   done
+  extra=$(join_by ' ' ${extra[@]})
 
-  cmd 'echo "# my dotfiles" > README.md'
-  cmd 'echo "|Source|Destination|" >> README.md'
-  cmd 'echo "|---|---|" >> README.md'
+  debug "sync args='$extra' direction='$direction'"
+
   while read line; do
     read orig spot <<<$(IFS="->"; echo $line)
-    if [ ${orig: -1} == "/" ]; then
-      cmd "echo '|$spot/|$orig|' >> README.md"
-    else
-      cmd "echo '|$spot|$orig|' >> README.md"
+    if [[ $direction == "to" ]]; then
+      sync "$orig" "$SPOTFILES_DIR/$spot" "$extra"
+    elif [[ $direction == "from" ]]; then
+      sync "$spot" "$orig" "$extra"
     fi
-
-    sync "$orig" "$spot" "$extra"
   done < <(cat $SPOTFILES_CONFIG | sort)
 
-  commit "manual sync"
-  push
+  if commit "manual sync"; then
+    push
+  fi
 }
 
 main "$@"
