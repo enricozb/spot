@@ -68,7 +68,7 @@ cmd() {
 }
 
 commit() {
-  if [[ -n $(git status --porcelain) ]]; then
+  if [[ -n $(git status --porcelain) ]] || [[ $DRY_RUN -eq 1 ]]; then
     local REDIRECT=$([ "$VERBOSE" -eq 0 ] && echo "> /dev/null")
     cmd "git add --all $REDIRECT"
     cmd "git commit -m '$1' $REDIRECT"
@@ -182,11 +182,11 @@ main() {
   fi
 
   local cmd
-  local args
+  local args=()
   case $1 in
     add|clone|list|pull|push|repo|sync)
-      cmd=${1}
-      args="${@:2}"
+      cmd="${1}"
+      args=("${@:2}")
       ;;
     *)
       error "command $(bold $1) not found."
@@ -210,14 +210,14 @@ main() {
   # ---------------------------------- main ----------------------------------
   # all operations should be done from within the spotfiles directory
   cd "$SPOTFILES_DIR"
-  debug "calling '${cmd}' with args=$args"
-  spot_${cmd} "$args"
+  debug "calling '${cmd}' with args=[$(join_by ',' "${args[@]}")]"
+  spot_${cmd} "${args[@]}"
 }
 
 
 # --------------------------------- commands ---------------------------------
 spot_add() {
-  local arg=${1%/}
+  local arg="${1%/}"
   shift
 
   local tracking_dir
@@ -305,7 +305,7 @@ spot_sync() {
       "x") extra+=("--delete");;
     esac
   done
-  extra=$(join_by ' ' ${extra[@]})
+  extra=$(join_by ' ' "${extra[@]}")
 
   debug "sync args='$extra' direction='$direction'"
 
