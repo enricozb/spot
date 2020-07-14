@@ -6,7 +6,8 @@ SPOT_LIB=$(dirname $(realpath "$0"))/lib
 SPOT_COMMANDS=$SPOT_LIB/commands
 SPOT_DIR=$HOME/.spot
 SPOT_FILES=$SPOT_DIR/files
-SPOT_MAPPING=$SPOT_DIR/mapping
+SPOT_SHARED_MAP_FILE=$SPOT_FILES/map
+SPOT_CUSTOM_MAP_FILE=$SPOT_DIR/map
 
 
 load_lib() {

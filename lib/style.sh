@@ -43,8 +43,8 @@ info() {
 }
 
 prompt() {
-  echo -n "$(green PROMPT:) $@ [y/n] "
-  read y_or_n
+  echo -n "$(green PROMPT:) ${@:2}"
+  read $1
 }
 
 warn() {
