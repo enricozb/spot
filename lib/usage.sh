@@ -3,9 +3,9 @@ usage() {
 spot - dotfile manager
 
 Usage: spot [options] command [args...]
-  spot track [(-d | --dir) name] (directory | files...)
+  spot track [(-d | --dir) name] (directory | file)
   spot repo url
-  spot sync [(-x | --delete)] [(-f | --from) | (-t | --to)] [(-m | --message)]
+  spot sync [(-f | --from) | (-t | --to)]
   spot edit
   spot list
 
@@ -28,7 +28,6 @@ Commands:
 
 Options:
   --help     print this message
-  --dry-run  print commands without executing them
   --verbose  print commands that are executed
 EOF
 }

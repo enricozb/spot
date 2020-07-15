@@ -52,6 +52,11 @@ EOF
       fi
     fi
 
+    # assume that if timestamps match then no diffs exist
+    if [[ $max_t == $max_s ]]; then
+      continue
+    fi
+
     if [[ $to != true && ( $from = true || $max_t -le $max_s ) ]]; then
       sync_pair $spot_file $tracked_file from
     else
