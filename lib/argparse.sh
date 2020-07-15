@@ -10,7 +10,7 @@ argparse() {
   done
 
   COMMAND=$1
-  COMMAND_ARGS=(${@:2})
+  COMMAND_ARGS=("${@:2}")
 }
 
 parse() {

@@ -3,7 +3,11 @@ spot_sync() {
     --interactive -i interactive
     --from -f from
     --to -t to
+    --message -m : message
 EOF
+
+  echo "message=$message"
+  exit 1
 
   local allopts="$interactive$from$to"
   if [[ ${#allopts} > 4 ]]; then
@@ -66,7 +70,11 @@ EOF
 
   git add .
   if [[ ! -z $(git status -s) ]]; then
-    git commit -m "manual sync"
+    if [[ -z $message ]]; then
+      git commit -m "manual sync"
+    else
+      git commit -m "$message"
+    fi
     git push --set-upstream origin master
   fi
 }
