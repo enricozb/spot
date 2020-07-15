@@ -15,8 +15,8 @@ EOF
   if [[ ! -d $SPOT_FILES ]]; then
     warn "spot files directory $(dirstyle $SPOT_FILES) does not exist"
     did_err=true
-  elif [[ ! -f $SPOT_MAP_FILE ]]; then
-    warn "spot files map $(dirstyle $SPOT_MAP_FILE) does not exist"
+  elif [[ ! -f $SPOT_SHARED_MAP_FILE ]]; then
+    warn "spot files map $(dirstyle $SPOT_SHARED_MAP_FILE) does not exist"
     did_err=true
   fi
 
@@ -26,72 +26,100 @@ EOF
   fi
 
   cd $SPOT_FILES
-  git pull remote origin
-  update_commit_times
+  git pull origin master
 
-  read_map SPOT_MAP $SPOT_MAP_FILE
+  update_commit_times
+  read_map
 
   for spot_file in "${!SPOT_MAP[@]}"; do
     local tracked_file=${SPOT_MAP[$spot_file]}
+
     # spot_file is the one under $SPOT_FILES
     # tracked_file is the one in the user's filesystem
-    echo $spot_file -> $tracked_file
-    read _ max_s <<< $(time_range $spot_file)
-    read _ max_t <<< $(time_range $tracked_file)
+    time_range spot_range "$spot_file"
+    time_range tracked_range "$tracked_file"
 
-    local interactive_from=false
+    read _ max_s <<< "$spot_range"
+    read _ max_t <<< "$tracked_range"
+
     if [[ $interactive = true ]]; then
       prompt input \
       	"sync $(bold FROM) or $(bold TO) $(dirstyle $spot_file)? [f / t]"
       if [[ $input = f ]]; then
-        interactive_from=true
+        from=true
+      else
+        to=true
       fi
     fi
 
-    if [[ $interactive_from = true ]] || (( $max_t < $max_s )) && [[ $to != true ]]; then
-      info "sync'd $(bold FROM) $spot_file"
-      sync_pair $spot_file $tracked_file
+    if [[ $to != true && ( $from = true || $max_t -le $max_s ) ]]; then
+      sync_pair $spot_file $tracked_file from
     else
-      info "sync'd $(bold ' TO ') $spot_file"
-      sync_pair $tracked_file $spot_file
+      sync_pair $tracked_file $spot_file to
     fi
   done
+
+  git add .
+  if [[ ! -z $(git status -s) ]]; then
+    git commit -m "manual sync"
+    git push --set-upstream origin master
+  fi
 }
 
 sync_pair() {
   local from=$1
-  local to=$1
+  local to=$2
+  local direction=$3
 
-  if [[ -f $from ]] && [[ -f $to ]]; then
-    cp -p $from $to
+  if [[ $direction = to ]]; then
+      info "sync $(dirstyle $to) $(bold '<-') $(dirstyle $from)"
+  else
+      info "sync $(dirstyle $from) $(bold '->') $(dirstyle $to)"
+  fi
+
+  if [[ ! -e $to ]]; then
+    mkdir -p $(dirname $to)
   elif [[ -d $from ]] && [[ -d $to ]]; then
     rm -r $to
-    cp -r -p $from $to
-  else
+  elif [[ ! -f $from ]] || [[ ! -f $to ]]; then
     error "invalid sync from $(dirstyle $from) to $(dirstyle $to)" \
           "since they are of different types"
   fi
+
+  cp -r -p $from $to
 }
 
-declare -A SPOT_MAP
 read_map() {
+  declare -g -A SPOT_MAP
   # read from shared map
   while IFS="" read -r line; do
     IFS=";" read spot_file tracked_file <<< "$line"
+
+    # remove whitespace
+    spot_file="${spot_file//[[:space:]]/}"
+    tracked_file="${tracked_file//[[:space:]]/}"
+
     if [[ -z $spot_file ]] || [[ -z $tracked_file ]]; then
       error "malformed map file $(dirstyle $SPOT_SHARED_MAP_FILE)" \
             "on line '$(bold $line)'"
     fi
-    SPOT_MAP[$spot_file]=$tracked_file
+    SPOT_MAP["$spot_file"]="$tracked_file"
   done < $SPOT_SHARED_MAP_FILE
 
   # read from custom map to override shared rules
-  while IFS="" read -r line; do
-    IFS=";" read spot_file tracked_file <<< "$line"
-    if [[ -z $spot_file ]] || [[ -z $tracked_file ]]; then
-      error "malformed map file $(dirstyle $SPOT_CUSTOM_MAP_FILE)" \
-            "on line '$(bold $line)'"
-    fi
-    SPOT_MAP[$spot_file]=$tracked_file
-  done < $SPOT_CUSTOM_MAP_FILE
+  if [[ -f $SPOT_CUSTOM_MAP_FILE ]]; then
+    while IFS="" read -r line; do
+      IFS=";" read spot_file tracked_file <<< "$line"
+
+      # remove whitespace
+      spot_file=${spot_file//[[:space:]]/}
+      tracked_file=${tracked_file//[[:space:]]/}
+
+      if [[ -z $spot_file ]] || [[ -z $tracked_file ]]; then
+        error "malformed map file $(dirstyle $SPOT_CUSTOM_MAP_FILE)" \
+              "on line '$(bold $line)'"
+      fi
+      SPOT_MAP[$spot_file]=$tracked_file
+    done < $SPOT_CUSTOM_MAP_FILE
+  fi
 }

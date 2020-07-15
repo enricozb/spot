@@ -3,6 +3,8 @@ spot_repo() {
     --replace -r replace
 EOF
 
+  init_spot_files
+
   cd $SPOT_FILES
   if [[ ! -d .git ]]; then
     info "initializing git repository at $(dirstyle $SPOT_FILES)"
@@ -14,4 +16,5 @@ EOF
   fi
 
   git remote add origin "$arg"
+  git pull origin master
 }

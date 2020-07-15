@@ -3,36 +3,31 @@ spot_track() {
     --dir -d : directory
     --force -f force
 EOF
-
   required track "$arg" "positional"
 
-  arg="${arg%/}"
+  if [[ ! -e $arg ]]; then
+    error "$(dirstyle $arg) does not exist"
+  fi
+  arg="${arg%/}" # strip forward slash
 
+  local dest
   if [[ -f $arg ]]; then
     required track "$directory" "(--dir | -d)" \
       "if argument is a file"
+
+    dest="$directory/$(basename $arg)"
   elif [[ -d $arg ]]; then
-    directory="$(basename $arg)"
-  else
-    error "$(dirstyle $arg) does not exist"
+    dest="$(basename $arg)"
   fi
 
-  local dest_dir=$SPOT_FILES/$directory
+  init_spot_files
 
-  if [[ -d $dest_dir ]]; then
-    error "$(dirstyle $dest_dir) is already being tracked"
+  if [[ -e $dest ]]; then
+    error "$(dirstyle $dest) is already being tracked"
   fi
+  cd $SPOT_FILES
 
-  if [[ ! -d $SPOT_FILES ]]; then
-    info "creating spot files directory $(dirstyle $SPOT_FILES)"
-    mkdir -p $SPOT_FILES
-  fi
+  sync_pair "$arg" "$dest"
 
-  info "tracking $(dirstyle $arg) under $(dirstyle $directory)"
-  if [[ -f $arg ]]; then
-    mkdir $dest_dir
-    cp -p $arg $dest_dir
-  else
-    cp -r -p $arg $dest_dir
-  fi
+  echo "$dest ; $arg" >> "$SPOT_SHARED_MAP_FILE"
 }

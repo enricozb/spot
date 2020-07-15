@@ -1,4 +1,8 @@
 update_commit_times() {
+  if [[ ! -d $SPOT_FILES ]]; then
+    error "update_commit_times requires $(dirstyle $SPOT_FILES) to exist"
+  fi
+
   cd $SPOT_FILES
   IFS="
   "
@@ -10,11 +14,15 @@ update_commit_times() {
 }
 
 time_range() {
-  if [[ ! -e $1 ]]; then
-    error "time range for nonexistent file $(dirstyle $1)"
+  local retvar=$1
+  local file=$2
+
+  if [[ ! -e $file ]]; then
+    eval "$retvar='0 0'"
+    return 0
   fi
 
-  find $1 -type f | xargs stat -c %Y | awk '
+  local ret=$(find "$file" -type f | xargs stat -c %Y | awk '
     NR == 1 { max=$1; min=$1; }
     {
       if ($1 > max) max=$1;
@@ -23,5 +31,7 @@ time_range() {
     END {
       printf "%d %d", min, max
     }
-  '
+  ')
+
+  eval "$retvar='$ret'"
 }

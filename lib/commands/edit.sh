@@ -13,7 +13,7 @@ EOF
     spot_map_file=$SPOT_CUSTOM_MAP_FILE
   fi
 
-  if [[ -f $spot_map_file ]]; then
+  if [[ $custom = true ]] || [[ -f $spot_map_file ]]; then
     if [[ -n $EDITOR ]]; then
       $EDITOR $spot_map_file
     elif [[ -n $VISUAL ]]; then
