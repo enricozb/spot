@@ -6,9 +6,6 @@ spot_sync() {
     --message -m : message
 EOF
 
-  echo "message=$message"
-  exit 1
-
   local allopts="$interactive$from$to"
   if [[ ${#allopts} > 4 ]]; then
     error "only one of $(bold --interactive), $(bold --from), $(bold --to)" \
