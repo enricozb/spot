@@ -45,8 +45,11 @@ EOF
 
     if [[ $interactive = true ]]; then
       prompt input \
-      	"sync $(bold FROM) or $(bold TO) $(dirstyle $spot_file)? [f / t]"
-      if [[ $input = f ]]; then
+      	"sync $(bold FROM) or $(bold TO) $(dirstyle $spot_file)," \
+      	"or $(bold NO) sync [f/t/n]? "
+      if [[ $input = n ]]; then
+          continue
+      elif [[ $input = f ]]; then
         from=true
       else
         to=true
@@ -54,7 +57,7 @@ EOF
     fi
 
     # assume that if timestamps match then no diffs exist
-    if [[ $max_t == $max_s ]]; then
+    if (( $max_t == $max_s )); then
       continue
     fi
 
