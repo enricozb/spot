@@ -33,10 +33,19 @@ spot_diff() {
     # colordiff returns an error code of 1 if diffs exist, and 0 otherwise
     # because of set -e, any non-zero exit code causes the script to stop
     # the || : guarantees a 0 exit code
+    declare from to
     if (( $max_s <= $max_t )); then
-      colordiff -r $spot_file $tracked_file || :
+      from=$spot_file
+      to=$tracked_file
     else
-      colordiff -r $tracked_file $spot_file || :
+      to=$spot_file
+      from=$tracked_file
+  fi
+
+    if ! colordiff -qr $from $to > /dev/null; then
+      echo ""
+      info "diff between $(dirstyle $from) -> $(dirstyle $to)"
+      colordiff -r $from $to || :
     fi
   done
 }
