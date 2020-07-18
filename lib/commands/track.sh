@@ -4,6 +4,7 @@ spot_track() {
     --force -f force
 EOF
   required track "$arg" "positional"
+  arg="$(realpath $arg)"
 
   if [[ ! -e $arg ]]; then
     error "$(dirstyle $arg) does not exist"
