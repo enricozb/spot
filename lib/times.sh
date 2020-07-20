@@ -23,17 +23,19 @@ time_range() {
     return 0
   fi
 
-  local ret=$(find "$file" -type f | xargs stat -c %Y | awk '
-    NR == 1 { max=$1; min=$1; }
-    {
-      if ($1 > max) max=$1;
-      if ($1 < min) min=$1;
-    }
-    END {
-      printf "%d %d", min, max
-    }
-  ')
+  local max=0
+  local min=0
+  while IFS= read -r file; do
+    local time=$(stat -c %Y "$file")
+    if [[ max = 0 || max < $time ]]; then
+      max=$time
+    fi
+
+    if [[ min = 0 || min > $time ]]; then
+      min=$time
+    fi
+  done < <(find "$file" -type f)
 
   debug "time computed as '$ret'"
-  eval "$retvar='$ret'"
+  eval "$retvar='$min $max'"
 }
