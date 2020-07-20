@@ -27,15 +27,15 @@ time_range() {
   local min=0
   while IFS= read -r file; do
     local time=$(stat -c %Y "$file")
-    if [[ max = 0 || max < $time ]]; then
+    if [[ $max = 0 || $max < $time ]]; then
       max=$time
     fi
 
-    if [[ min = 0 || min > $time ]]; then
+    if [[ $min = 0 || $min > $time ]]; then
       min=$time
     fi
   done < <(find "$file" -type f)
 
-  debug "time computed as '$ret'"
+  debug "time computed as '$min $max'"
   eval "$retvar='$min $max'"
 }
