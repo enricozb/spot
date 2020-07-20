@@ -62,9 +62,9 @@ EOF
     fi
 
     if [[ $to != true && ( $from = true || $max_t -le $max_s ) ]]; then
-      sync_pair $spot_file $tracked_file from
+      sync_pair "$spot_file" "$tracked_file" from
     else
-      sync_pair $tracked_file $spot_file to
+      sync_pair "$tracked_file" "$spot_file" to
     fi
   done
 
@@ -85,21 +85,21 @@ sync_pair() {
   local direction=$3
 
   if [[ $direction = to ]]; then
-      info "sync $(dirstyle $to) $(bold '<-') $(dirstyle $from)"
+    info "sync $(dirstyle $to) $(bold '<-') $(dirstyle $from)"
   else
-      info "sync $(dirstyle $from) $(bold '->') $(dirstyle $to)"
+    info "sync $(dirstyle $from) $(bold '->') $(dirstyle $to)"
   fi
 
   if [[ ! -e $to ]]; then
     mkdir -p $(dirname $to)
   elif [[ -d $from ]] && [[ -d $to ]]; then
-    rm -r $to
+    rm -r "$to"
   elif [[ ! -f $from ]] || [[ ! -f $to ]]; then
     error "invalid sync from $(dirstyle $from) to $(dirstyle $to)" \
           "since they are of different types"
   fi
 
-  cp -r -p $from $to
+  cp -r -p "$from" "$to"
 }
 
 read_map() {

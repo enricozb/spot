@@ -4,18 +4,19 @@ update_commit_times() {
   fi
 
   cd $SPOT_FILES
-  IFS="
-  "
-  for file in $(git ls-files); do
+  while IFS= read -r file; do
+    debug "updating times for '$file'"
     local time=$(git log --pretty=format:%cd -n 1 --date=iso -- "$file")
     time=$(date -d "$time" +%Y%m%d%H%M.%S)
     touch -m -t "$time" "$file"
-  done
+  done < <(git ls-files)
 }
 
 time_range() {
   local retvar=$1
   local file=$2
+
+  debug "computing time range for '$file' into '$1'"
 
   if [[ ! -e $file ]]; then
     eval "$retvar='0 0'"
@@ -33,5 +34,6 @@ time_range() {
     }
   ')
 
+  debug "time computed as '$ret'"
   eval "$retvar='$ret'"
 }
